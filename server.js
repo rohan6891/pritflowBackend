@@ -15,7 +15,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*", // Adjust to match your frontend port
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST","PUT"]
   }
 });
 
