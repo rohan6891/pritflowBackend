@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 
 const { MONGO_URL, PORT } = require("./config");
 
@@ -15,9 +17,15 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: "*", // Adjust to match your frontend port
-    methods: ["GET", "POST","PUT"]
+    methods: ["GET", "POST", "PUT"]
   }
 });
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
 
 // Middlewares
 app.use(cors());
