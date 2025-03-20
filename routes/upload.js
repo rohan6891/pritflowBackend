@@ -82,7 +82,7 @@ router.post('/:shopId', upload.single('file'), async (req, res) => {
 });
 
 // Route to handle file download
-router.get('/download/:filePath(*)', async (req, res) => {
+router.get('/download/:filePath', async (req, res) => {
     const filePath = req.params.filePath;
     const fullPath = path.join(__dirname, '..', filePath);
 
