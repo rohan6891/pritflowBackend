@@ -6,7 +6,6 @@ const mongoose = require('mongoose');
 const Customer = require('../models/customer');
 const File = require('../models/file');
 const PrintJob = require('../models/printjob');
-const fs = require('fs');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -79,25 +78,6 @@ router.post('/:shopId', upload.single('file'), async (req, res) => {
         console.error(error);
         res.status(500).json({ error: 'Failed to create print job' });
     }
-});
-
-// Route to handle file download
-router.get('/download/:filePath', async (req, res) => {
-    const filePath = req.params.filePath;
-    const fullPath = path.join(__dirname, '..', filePath);
-
-    // Check if file exists
-    if (!fs.existsSync(fullPath)) {
-        return res.status(404).json({ error: 'File not found' });
-    }
-
-    // Send the file
-    res.download(fullPath, (err) => {
-        if (err) {
-            console.error('Error downloading file:', err);
-            res.status(500).json({ error: 'Failed to download file' });
-        }
-    });
 });
 
 module.exports = router;
