@@ -7,7 +7,7 @@ const Shop = require('../models/shop');
 const QRCode = require('qrcode');
 
 // global variables
-const { JWT_SECRET } = require("../config");
+const { JWT_SECRET, BASE_FRONTEND_URL } = require("../config");
 
 // Register shop route
 router.post('/register', async (req, res) => {
@@ -35,7 +35,7 @@ router.post('/register', async (req, res) => {
         await newShop.save();
 
         // Generate the QR code URL using the shop's ID
-        const qrData = `http://localhost:5173/upload?shop_id=${newShop._id}`;
+        const qrData = `${BASE_FRONTEND_URL}/upload?shop_id=${newShop._id}`;
         const qrCodeURL = await QRCode.toDataURL(qrData);
 
         console.log();
