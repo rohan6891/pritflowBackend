@@ -14,14 +14,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*", // Adjust to match your frontend port
-    methods: ["GET", "POST", "PUT"]
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST']
   }
 });
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('uploads'));
 
 // DB connection
@@ -32,6 +33,11 @@ mongoose.connect(MONGO_URL)
 // Set socket.io instance in app
 app.set("socketio", io);
 
+// Add this root level health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Routes
 app.use('/api/shop', shopRoutes);
 app.use('/api/printjobs', printJobRoutes);
@@ -39,16 +45,19 @@ app.use('/api/upload', uploadRoutes);
 
 // WebSocket connection
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
-
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+  console.log(`Client connected: ${socket.id}`);
+  
+  // Handle shop room joining
+  socket.on('joinShopRoom', (shopId) => {
+    if (shopId) {
+      const roomName = `shop_${shopId}`;
+      socket.join(roomName);
+      console.log(`Client ${socket.id} joined room: ${roomName}`);
+    }
   });
   
-  // Add room joining logic
-  socket.on("joinShopRoom", (shopId) => {
-    socket.join(`shop_${shopId}`);
-    console.log(`Socket ${socket.id} joined room: shop_${shopId}`);
+  socket.on('disconnect', () => {
+    console.log(`Client disconnected: ${socket.id}`);
   });
 });
 

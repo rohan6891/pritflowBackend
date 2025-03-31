@@ -7,77 +7,109 @@ const Customer = require('../models/customer');
 const File = require('../models/file');
 const PrintJob = require('../models/printjob');
 
-// Configure multer for file uploads
+// Configure multer storage
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, './uploads/');
+    destination: function(req, file, cb) {
+        cb(null, 'uploads/'); // Ensure this directory exists
     },
-    filename: (req, file, cb) => {
-        cb(null, `${Date.now()}-${file.originalname}`);
+    filename: function(req, file, cb) {
+        // Sanitize filename if necessary, or use a unique ID
+        cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'));
     }
 });
 
-const upload = multer({ storage });
+// Configure multer instance
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 15 * 1024 * 1024 } // Increased limit slightly just in case
+});
 
-// Handle file upload and create print job
-router.post('/:shopId', upload.single('file'), async (req, res) => {
-    const { shopId } = req.params;
-    const { print_type, print_side, copies } = req.body;
+// Add a health check endpoint
+router.get('/health', (req, res) => {
+    res.status(200).send('Upload route OK');
+});
 
-    if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-    }
-
+// Modify the upload route to handle multiple files in a single job
+router.post('/:shopId', upload.array('files', 10), async (req, res) => {
+    console.log(`Upload handler reached for shop: ${req.params.shopId}`);
+    
     try {
-        const token_number = Math.floor(10000 + Math.random() * 90000).toString();
-        const file_path = req.file.path;
-        const fileSize = req.file.size; // Get file size from Multer
-
-        // Create a new file entry with fileSize
-        const newFile = new File({
+        const shopId = req.params.shopId;
+        
+        // Validate files
+        if (!req.files || req.files.length === 0) {
+            console.error('No files uploaded');
+            return res.status(400).json({ error: 'No files uploaded' });
+        }
+        
+        // Validate print options
+        const { print_type, print_side, copies } = req.body;
+        if (!print_type || !print_side || !copies) {
+            console.error('Missing print options');
+            return res.status(400).json({ error: 'Missing print options' });
+        }
+        
+        // Generate a single token for all files
+        const token = generateToken();
+        
+        // Create a single print job with all files
+        const printJob = new PrintJob({
             shop_id: shopId,
-            token_number,
-            file_path,
-            fileSize // Save file size
-        });
-        await newFile.save();
-
-        // Create a new print job entry with fileSize
-        const newPrintJob = new PrintJob({
-            shop_id: shopId,
-            token_number,
-            file_path,
+            token_number: token,
             print_type,
             print_side,
-            copies,
-            fileName: req.file.originalname, // Include file name
-            fileSize, // Include file size
+            copies: parseInt(copies, 10) || 1,
             status: 'pending',
-            uploaded_at: new Date()
+            files: req.files.map(file => ({
+                fileName: file.originalname,
+                filePath: file.path,
+                fileSize: file.size
+            }))
         });
-        await newPrintJob.save();
-
-        // Emit WebSocket event with fileSize
+        
+        const savedJob = await printJob.save();
+        console.log(`Created print job with token ${token} and ${req.files.length} files`);
+        
+        // Emit WebSocket notification
         const io = req.app.get("socketio");
-        console.log("Emitting newPrintJob event:", newPrintJob._id); // Debug log
-        io.emit("newPrintJob", {
-            id: newPrintJob._id,
-            fileType: path.extname(req.file.originalname).slice(1), // e.g., "pdf"
-            printType: newPrintJob.print_type,
-            printSide: newPrintJob.print_side,
-            copies: newPrintJob.copies,
-            token: newPrintJob.token_number,
-            status: newPrintJob.status,
-            uploadTime: newPrintJob.uploaded_at,
-            fileName: newPrintJob.fileName,
-            fileSize: newPrintJob.fileSize // Include file size in event
+        if (io) {
+            io.to(`shop_${shopId}`).emit('newBatchPrintJob', {
+                id: savedJob._id,
+                token: savedJob.token_number,
+                files: savedJob.files,
+                printType: savedJob.print_type,
+                printSide: savedJob.print_side,
+                copies: savedJob.copies,
+                status: savedJob.status,
+                uploadTime: savedJob.uploaded_at
+            });
+            console.log(`Sent WebSocket notification for new batch job to shop_${shopId}`);
+        }
+        
+        res.status(201).json({
+            message: `${req.files.length} files uploaded successfully`,
+            token_number: token,
+            count: req.files.length,
+            files: req.files.map(file => ({
+                fileName: file.originalname,
+                fileSize: file.size
+            }))
         });
-
-        res.status(201).json({ message: 'File uploaded and print job created', token_number });
+        
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to create print job' });
+        console.error('Error in upload handler:', error);
+        res.status(500).json({ error: 'Server error during file processing' });
     }
 });
+
+// Helper function (ensure this exists)
+function generateToken(length = 6) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+}
 
 module.exports = router;
