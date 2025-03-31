@@ -45,17 +45,8 @@ app.use('/api/upload', uploadRoutes);
 
 // WebSocket connection
 io.on("connection", (socket) => {
-  const origin = socket.handshake.headers.origin;
-
-  // Validate the Origin header
-  if (origin !== process.env.FRONTEND_URL) {
-    console.log(`Connection rejected: Invalid origin ${origin}`);
-    socket.disconnect(true); // Disconnect the client
-    return;
-  }
-
   console.log(`Client connected: ${socket.id}`);
-
+  
   // Handle shop room joining
   socket.on('joinShopRoom', (shopId) => {
     if (shopId) {
@@ -64,7 +55,7 @@ io.on("connection", (socket) => {
       console.log(`Client ${socket.id} joined room: ${roomName}`);
     }
   });
-
+  
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}`);
   });
