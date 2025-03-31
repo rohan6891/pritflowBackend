@@ -34,8 +34,8 @@ router.post('/register', async (req, res) => {
         });
         await newShop.save();
 
-        // Generate the QR code URL using the shop's ID and BASE_FRONTEND_URL
-        const qrData = `intent://${BASE_FRONTEND_URL}/upload?shop_id=${newShop._id}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${BASE_FRONTEND_URL}/upload?shop_id=${newShop._id};end`;
+        // Generate the QR code URL using the shop's ID
+        const qrData = `${BASE_FRONTEND_URL}/upload?shop_id=${newShop._id}`;
         const qrCodeURL = await QRCode.toDataURL(qrData);
 
         console.log();
